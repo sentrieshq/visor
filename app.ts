@@ -1,14 +1,15 @@
-import 'dotenv/config';
+import 'dotenv/config'
 import got from 'got-cjs'
 import { parseJSON } from 'date-fns'
 import { Client, SSLMode, SSL } from 'ts-postgres'
 
-const HOST = process.env.HOST
-const PORT = process.env.PORT
-const USER = process.env.USER
-const PASSWORD = process.env.PASSWORD
-const DB = process.env.DB
+const HOST = process.env.DB_HOST
+const PORT = process.env.DB_PORT
+const USER = process.env.DB_USER
+const PASSWORD = process.env.DB_PASSWORD
+const DB = process.env.DB_DATABASE
 
+require('dotenv').config({ debug: true })
 
 interface priceData {
     symbol?: string
@@ -33,8 +34,8 @@ const config = {
     launch: false,
     allNfts: false,
     prices: false,
-    discord: true,
-    twitter: false
+    discord: false,
+    twitter: true
 }
 
 let merged = []
@@ -357,6 +358,10 @@ const main = async() => {
                 )
             } catch (e) {
                 console.log('error')
+                const flag = await client.query(
+                    `UPDATE nfts SET discord_invalid = TRUE WHERE nft_symbol = $1`,
+                    [nftSymbol]
+                )
                 console.log(e)
             }
         }
