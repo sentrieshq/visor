@@ -279,7 +279,7 @@ const main = async() => {
 
     if (config.discord) {
         // TODO: Fetch from DB
-        const queryResult = await client.query(`SELECT nft_symbol, discord FROM nfts WHERE discord IS NOT NULL AND discord_invalid IS FALSE AND nft_id >= 749 ORDER BY nft_id ASC;`)
+        const queryResult = await client.query(`SELECT nft_symbol, discord FROM nfts WHERE discord IS NOT NULL AND discord_invalid IS FALSE ORDER BY nft_id ASC;`)
         
         for (const row of queryResult.rows) {
             if (!row || !row[0] || !row[1] || row[1] === 'undefined'){
