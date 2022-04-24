@@ -298,7 +298,7 @@ const main = async() => {
                 SELECT nft_id
                 FROM latest_update
                 WHERE created_at IS NULL
-                OR created_at > NOW() - INTERVAL '1 hours'
+                OR created_at > NOW() - INTERVAL '3 hours'
             )
             SELECT nft_symbol, discord FROM vaid_discords WHERE nft_id NOT IN (SELECT * FROM filter_recents);`
         )
