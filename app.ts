@@ -300,7 +300,7 @@ const main = async() => {
                 WHERE created_at IS NULL
                 OR created_at > NOW() - INTERVAL '1 hours'
             )
-            SELECT nft_id, discord FROM vaid_discords WHERE nft_id NOT IN (SELECT * FROM filter_recents);`
+            SELECT nft_symbol, discord FROM vaid_discords WHERE nft_id NOT IN (SELECT * FROM filter_recents);`
         )
         
         for (const row of queryResult.rows) {
