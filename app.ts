@@ -377,6 +377,7 @@ const main = async() => {
                 )
             } catch (e) {
                 console.log('error')
+                // TODO: Issue with this setting valid shared social
                 const flag = await client.query(
                     `UPDATE nfts SET discord_invalid = TRUE WHERE nft_symbol = $1`,
                     [nftSymbol]
@@ -488,6 +489,7 @@ const main = async() => {
 
     console.log('Ended')
     await client.end()
+    process.exit(0)
     return true
 }
 
