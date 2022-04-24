@@ -56,7 +56,7 @@ const shallowEqual = async(object1, object2) => {
 
 const timer = ms => new Promise(res => setTimeout(res, ms))
 
-// TODO: Fetch once
+
 const getMeNft = async(offset=0, limit=200, fData=[]) => {
     // TODO: Add support for paginating
     /*
@@ -92,13 +92,10 @@ const getMeNft = async(offset=0, limit=200, fData=[]) => {
                 await getMeNft(offset, limit, merged)
             }
         }
-        //console.log(merged)
-        // ToDo: Loop if length of data until data isn't 200 or 0
-        //console.log(data)
-        return merged
     } catch (e) {
         console.error(e)
     }
+    return merged
 }
 
 const getMeLaunchpadStats = async(offset=0, limit=200) => {
@@ -289,7 +286,7 @@ const main = async() => {
                 console.log(row)
                 continue
             }
-            await timer(3000);
+            await timer(5000);
             let inviteCode = row[1].toString().replace('https://discord.gg/invite/', '')
             inviteCode = inviteCode.replace('https://www.discord.gg/invite/', '')
             inviteCode = inviteCode.replace('https://www.discord.com/invite/', '')
@@ -468,7 +465,8 @@ const main = async() => {
     }
 
     console.log('Ended')
-    return
+    await client.end()
+    return true
 }
 
 main()
