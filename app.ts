@@ -31,11 +31,11 @@ interface twitterData {
 }
 
 const config = {
-    launch: false,
-    allNfts: false,
-    prices: false,
-    discord: false,
-    twitter: true
+    launch: process.env.LAUNCHPAD || false,
+    allNfts: process.env.MAGICEDEN || false,
+    prices: process.env.PRICE || false,
+    discord: process.env.DISCORD || false,
+    twitter: process.env.TWITTER || false
 }
 
 let merged = []
@@ -468,6 +468,7 @@ const main = async() => {
     }
 
     console.log('Ended')
+    return
 }
 
 main()
