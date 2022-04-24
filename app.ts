@@ -286,7 +286,7 @@ const main = async() => {
                 console.log(row)
                 continue
             }
-            await timer(5000);
+            await timer(500);
             let inviteCode = row[1].toString().replace('https://discord.gg/invite/', '')
             inviteCode = inviteCode.replace('https://www.discord.gg/invite/', '')
             inviteCode = inviteCode.replace('https://www.discord.com/invite/', '')
