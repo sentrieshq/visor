@@ -279,7 +279,29 @@ const main = async() => {
 
     if (config.discord) {
         // TODO: Fetch from DB
-        const queryResult = await client.query(`SELECT nft_symbol, discord FROM nfts WHERE discord IS NOT NULL AND discord_invalid IS FALSE ORDER BY nft_id ASC;`)
+        const queryResult = await client.query(
+            `WITH vaid_discords AS (
+                SELECT *
+                FROM nfts
+                WHERE discord_invalid IS FALSE
+                AND discord IS NOT NULL
+            ), latest_update AS (
+                SELECT
+                DISTINCT ON (discord_stats.nft_symbol)
+                vaid_discords.nft_id AS nft_id,
+                vaid_discords.nft_symbol AS nft_symbol,
+                discord_stats.created_at AS created_at
+                FROM vaid_discords
+                LEFT JOIN discord_stats ON discord_stats.nft_symbol = vaid_discords.nft_symbol
+                ORDER BY discord_stats.nft_symbol, discord_stats.created_at DESC
+            ), filter_recents AS (
+                SELECT nft_id
+                FROM latest_update
+                WHERE created_at IS NULL
+                OR created_at > NOW() - INTERVAL '1 hours'
+            )
+            SELECT nft_id, discord FROM vaid_discords WHERE nft_id NOT IN (SELECT * FROM filter_recents);`
+        )
         
         for (const row of queryResult.rows) {
             if (!row || !row[0] || !row[1] || row[1] === 'undefined'){
