@@ -31,11 +31,13 @@ interface twitterData {
 }
 
 const config = {
+    drops: process.env.DROPS || false,
     launch: process.env.LAUNCHPAD || false,
     allNfts: process.env.MAGICEDEN || false,
     prices: process.env.PRICE || false,
     discord: process.env.DISCORD || false,
-    twitter: process.env.TWITTER || false
+    twitter: process.env.TWITTER || false,
+    activity: process.env.ACTIVITY || false
 }
 
 let merged = []
@@ -205,6 +207,75 @@ const getTwitterStats = async(twitterName: string) => {
     return data
 }
 
+const getMeActivity = async(symbol: string, offset: number = 0, limit: number = 500) => {
+    /*
+    [
+        {
+            "signature": "4AxXimQ49UU87PsRQVXk2Q8RP3G2wuSrNd2ZAv2HTWLZpdhv31RBkQ3zM8zkpK9JKS2TgR2cz4t3zfj6aTT5gjCF",
+            "type": "cancelBid",
+            "source": "magiceden_v2",
+            "tokenMint": "3nCs3tqujtQ37gygKsPKoHbZUsK4ZbMx1EEpoijU4P4A",
+            "collection": "runcible",
+            "slot": 111599503,
+            "blockTime": 1643673130,
+            "buyer": "GDNWh13absa2e3tvTXLRQQMofaEjo1ajTRXR3nVbBrQp",
+            "buyerReferral": "",
+            "seller": null,
+            "sellerReferral": "",
+            "price": 0
+        },
+    ]
+    */
+    const url = `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/activities?offset=${offset}&limit=${limit}`
+    // TODO: Recursion?? For how long?
+    const data = await got.get(url).json()
+    return data
+}
+
+const getMeDrops = async(limit: number = 250, offset: number = 0) => {
+    /*
+    [
+        {
+            "name": "Everseed",
+            "symbol": "everseed",
+            "description": "Everseed is a new, wondrous world of enchanted flora and fauna. Adventure awaits those who dare delve into the overgrowth, searching to collect rare seedlings. 🌱\n\nEach seedling type is unique, but they all help players grow and farm various resources. Seedlings and other goods can be traded freely in a player-owned economy, influenced by player governance. Everseed is the sprouting of a new community-first society. 🌿\n\nWelcome home! 💚",
+            "derivative": null,
+            "links": {
+                "twitter": "https://twitter.com/playeverseed",
+                "discord": "https://discord.gg/everseed"
+            },
+            "assets": {
+                "profileImage": "https://dl.airtable.com/.attachmentThumbnails/e435b9e1a178278258f79255bc7c4dbf/b0021a95"
+            },
+            "launchDate": "2022-04-20T16:20:00.000Z",
+            "isMeLaunchPad": true,
+            "upvote": 289
+        }, 
+    ]
+    */
+    const url = `https://api-mainnet.magiceden.dev/drops?limit=${limit}&offset=${offset}`
+    // TODO: Recursion?? For how long?
+    const data = await got.get(url).json()
+    return data as object
+}
+
+const getMeListings = async(symbol: string, limit: number = 20, offset: number = 0) => {
+    /*
+    [
+        {
+            "pdaAddress": "BaUX9EGhbqdEHhLDN3Ypd4M97P1czX8H87H8smcV3Ee4",
+            "auctionHouse": "",
+            "tokenAddress": "HP91KznvAa7unW6cE4ZG7cU3YNUjuJNeGg4PVGRa9byB",
+            "tokenMint": "HdcrPMF4kHKqy5V9JibNSoWLNpqnxQUBDEBeimZkLf7u",
+            "seller": "EWmtsfBA8EikR3vvhsXgxn7cBQCUZfXJ7jMwXUpYRzXY",
+            "tokenSize": 1,
+            "price": 99
+        },
+    ]
+    */
+    const url = `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/listings?limit=${limit}&offset=${offset}`
+}
+
 const main = async() => {
     const client = new Client({
         host: HOST,
@@ -219,6 +290,35 @@ const main = async() => {
         console.log("connected")
     } catch(e) {
         console.error(e)
+    }
+
+    if (config.drops) {
+        const dropsData = await getMeDrops()
+        for(const drop in dropsData) {
+            const item = dropsData[drop]
+            const name = item.name
+            const symbol = item.symbol
+            const description = item.description
+            const image = item.assets.profileImage ? item.assets.profileImage : null
+            const twitter = item.links.twitter ? item.links.twitter : null
+            const discord = item.links.discord ? item.links.discord : null
+            const website = item.links.website ? item.links.website : null
+            let launchDate = item.launchDate
+            if (launchDate) {
+                launchDate = parseJSON(launchDate)
+            } else {
+                launchDate = null
+            }
+            try {
+                const result = await client.query(
+                    `SELECT * FROM store_nft ($1, $2, $3, $4, $5, $6, $7::TIMESTAMPTZ, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);`,
+                    [symbol, name, description, image, twitter, discord, launchDate]
+                )
+            } catch (e) {
+                console.log(item)
+                console.error(e)
+            }
+        }
     }
     
     if (config.launch) {
@@ -362,6 +462,10 @@ const main = async() => {
                                 `INSERT INTO discord (nft_symbol, type, expires_at, guild_id, name, splash, banner, description, icon, verification_level, vanity_url_code, nsfw, nsfw_level) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);`,
                                 [nftSymbol, type, expiresAt, guildId, name, splash, banner, description, icon, verificationLevel, vanityUrlCode, nsfw, nsfwLevel]
                             )
+                            const result2 = await client.query(
+                                `INSERT INTO discord_nfts (discord_id, nft_symbol) VALUES ((SELECT discord_id FROM discord WHERE nft_symbol = $1), $1);`,
+                                [nftSymbol]
+                            )
                         } catch (e) {
                             console.error(e)
                         }
@@ -425,6 +529,10 @@ const main = async() => {
                                 `INSERT INTO twitter (nft_symbol, screen_name, name, protected, age_gated, remote_id) VALUES ($1, $2, $3, $4, $5, $6);`,
                                 [nftSymbol, screenName, name, _protected, ageGated, remoteId]
                             )
+                            const result2 = await client.query(
+                                `INSERT INTO twitter (twitter_id, nft_symbol) VALUES ((SELECT twitter_id FROM twitter WHERE nft_symbol = $1), $1);`,
+                                [nftSymbol]
+                            )
                         } catch (e) {
                             console.error(e)
                         }
@@ -481,6 +589,54 @@ const main = async() => {
                 } catch(e) {
                     console.error(e)
                 }
+            } catch (e) {
+                console.error(e)
+            }
+        }
+    }
+
+    if(config.activity) {
+        const queryResult = await client.query(`SELECT nft_symbol FROM nfts;`)
+
+        for (const row of queryResult.rows) {
+            if (!row || !row[0]){
+                continue
+            }
+            await timer(1500);
+            const symbol = row[0].toString()
+            try {
+                const activityData = await getMeActivity(symbol) as object
+                if (!activityData) {
+                    continue
+                }
+                client.query(`BEGIN;`)
+                for(let activity in activityData){
+                    const item = activityData[activity]
+                    const signature = item.signature
+                    const type = item.type
+                    const source = item.source
+                    const tokenMint = item.tokenMint
+                    const collection = item.collection
+                    const slot = item.slot
+                    const blockTime = item.blockTime
+                    const buyer = item.buyer ? item.buyer : null
+                    const buyerReferral = item.buyerReferral ? item.buyerReferral : null
+                    const seller = item.seller ? item.seller : null
+                    const sellerReferral = item.sellerReferral ? item.sellerReferral : null
+                    const price = item.price
+                    console.log(item)
+                    try {
+                        // TODO: Break this out into a function
+                        client.query(
+                            `INSERT INTO nft_activity (signature, type, source, token_mint, nft_symbol, slot, blocktime, buyer, buyer_referral, seller, seller_referral, price)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, ${price}::NUMERIC);`,
+                            [signature, type, source, tokenMint, collection, slot, blockTime, buyer, buyerReferral, seller, sellerReferral]
+                        )
+                    } catch (e) {
+                        console.error(e)
+                    }
+                }
+                await client.query(`COMMIT;`)
             } catch (e) {
                 console.error(e)
             }

@@ -173,3 +173,33 @@ CREATE FUNCTION store_discord (
 )
 $$
 $$;
+
+
+-- TODO: Fix
+CREATE FUNCTION fetch_discords_pending_update ()
+RETURNS TABLE ("nft_id" BIGINT, "discord" TEXT)
+LANGUAGE plpgsql
+AS $$
+WITH vaid_discords AS (
+	SELECT *
+	FROM nfts
+	WHERE discord_invalid IS FALSE
+	AND discord IS NOT NULL
+), latest_update AS (
+	SELECT
+	DISTINCT ON (discord_stats.nft_symbol)
+	vaid_discords.nft_id AS nft_id,
+	vaid_discords.nft_symbol AS nft_symbol,
+	discord_stats.created_at AS created_at
+	FROM vaid_discords
+	LEFT JOIN discord_stats ON discord_stats.nft_symbol = vaid_discords.nft_symbol
+	ORDER BY discord_stats.nft_symbol, discord_stats.created_at DESC
+), filter_recents AS (
+	SELECT nft_id
+	FROM latest_update
+	WHERE created_at IS NULL
+	OR created_at > NOW() - INTERVAL '1 hours'
+)
+SELECT nft_id, discord FROM vaid_discords WHERE nft_id NOT IN (SELECT * FROM filter_recents)
+RETURNING nft_id, discord;
+$$;
