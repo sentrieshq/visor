@@ -123,3 +123,74 @@ WITH current_twitter AS (
 	SELECT twitter_id, nft_symbol FROM twitter
 )
 INSERT INTO twitter_nfts (twitter_id, nft_symbol) SELECT * FROM current_twitter;
+
+
+--INSERT INTO twitter_nfts (twitter_id, nft_symbol)
+WITH with_discord AS (
+SELECT * FROM nfts WHERE discord IS NOT NULL
+), join_discords AS (
+	SELECT
+		with_discord.nft_symbol AS filtered,
+		nfts.nft_symbol AS matching,
+		nfts.discord
+	FROM nfts
+	JOIN with_discord ON with_discord.discord = nfts.discord
+	WHERE nfts.nft_symbol != with_discord.nft_symbol
+), missing_discord AS (
+	SELECT 
+		filtered AS m_d_filtered,
+		matching AS m_d_matching,
+		join_discords.discord AS m_d_discord
+	FROM join_discords LEFT JOIN discord_nfts ON discord_nfts.nft_symbol = join_discords.filtered WHERE discord_nfts.discord_id IS NULL
+), has_discord AS (
+	SELECT
+		filtered AS h_d_filtered,
+		matching AS h_d_matching,
+		join_discords.discord AS h_d_discord,
+		discord_nfts.discord_id AS discord_id
+	FROM join_discords LEFT JOIN discord_nfts ON discord_nfts.nft_symbol = join_discords.matching WHERE discord_nfts.discord_id IS NOT NULL
+), join_two AS (
+	SELECT * FROM missing_discord JOIN has_discord ON has_discord.h_d_discord = missing_discord.m_d_discord
+)
+--INSERT INTO discord_nfts (discord_id, nft_symbol) 
+SELECT discord_id, h_d_filtered FROM join_two WHERE h_d_filtered NOT IN (SELECT nft_symbol FROM discord_nfts) GROUP BY discord_id, h_d_filtered;
+
+
+WITH with_twitter AS (
+	SELECT * FROM nfts WHERE twitter IS NOT NULL
+), join_twitter AS (
+	SELECT
+		with_twitter.nft_symbol AS filtered,
+		nfts.nft_symbol AS matching,
+		nfts.twitter
+	FROM nfts
+	JOIN with_twitter ON with_twitter.twitter = nfts.twitter
+	WHERE nfts.nft_symbol != with_twitter.nft_symbol
+), missing_twitter AS (
+	SELECT 
+		filtered AS m_d_filtered,
+		matching AS m_d_matching,
+		join_twitter.twitter AS m_d_twitter
+	FROM join_twitter LEFT JOIN twitter_nfts ON twitter_nfts.nft_symbol = join_twitter.filtered WHERE twitter_nfts.twitter_id IS NULL
+), has_twitter AS (
+	SELECT
+		filtered AS h_d_filtered,
+		matching AS h_d_matching,
+		join_twitter.twitter AS h_d_twitter,
+		twitter_nfts.twitter_id AS twitter_id
+	FROM join_twitter LEFT JOIN twitter_nfts ON twitter_nfts.nft_symbol = join_twitter.matching WHERE twitter_nfts.twitter_id IS NOT NULL
+), join_two AS (
+	SELECT * FROM missing_twitter JOIN has_twitter ON has_twitter.h_d_twitter = missing_twitter.m_d_twitter
+)
+--INSERT INTO twitter_nfts (twitter_id, nft_symbol) 
+SELECT twitter_id, h_d_filtered FROM join_two WHERE h_d_filtered NOT IN (SELECT nft_symbol FROM twitter_nfts) GROUP BY twitter_id, h_d_filtered;
+
+
+SELECT
+nft_symbol,
+COUNT(*) AS total_72h_sales,
+AVG(price)
+FROM nft_activity
+WHERE buyer IS NOT NULL and seller IS NOT NULL
+AND type = 'buyNow' AND TO_TIMESTAMP(blocktime) < NOW() - INTERVAL '72 hours'
+GROUP BY nft_symbol ORDER BY COUNT(*) DESC;

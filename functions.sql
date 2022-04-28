@@ -174,6 +174,133 @@ CREATE FUNCTION store_discord (
 $$
 $$;
 
+CREATE FUNCTION store_activity (
+    _signature TEXT,
+    _type TEXT,
+    _source TEXT,
+    _token_mint TEXT,
+    _nft_symbol TEXT,
+    _slot BIGINT,
+    _blocktime BIGINT,
+    _buyer TEXT DEFAULT NULL,
+    _buyer_referral TEXT DEFAULT NULL,
+    _seller TEXT DEFAULT NULL,
+    _seller_referral TEXT DEFAULT NULL,
+    _price NUMERIC DEFAULT NULL
+)
+RETURNS TABLE ("activity_id" BIGINT, "nft_symbol" TEXT, "type" TEXT)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    _activity_id BIGINT;
+    __signature TEXT;
+    __type TEXT;
+    __source TEXT;
+    __token_mint TEXT;
+    __nft_symbol TEXT;
+    __slot BIGINT;
+    __blocktime BIGINT;
+    __buyer TEXT;
+    __buyer_referral TEXT;
+    __seller TEXT;
+    __seller_referral TEXT;
+    __price NUMERIC;
+    _created_at TIMESTAMPTZ;
+BEGIN
+    BEGIN
+        SELECT 
+            n.activity_id,
+            n.signature,
+            n.type,
+            n.source,
+            n.token_mint,
+            n.nft_symbol,
+            n.slot,
+            n.blocktime,
+            n.buyer,
+            n.buyer_referral,
+            n.seller,
+            n.seller_referral,
+            n.price,
+            n.created_at
+        INTO STRICT
+            _activity_id,
+            __signature,
+            __type,
+            __source,
+            __token_mint,
+            __nft_symbol,
+            __slot,
+            __blocktime,
+            __buyer,
+            __buyer_referral,
+            __seller,
+            __seller_referral,
+            __price,
+            _created_at
+        FROM nft_activity n
+        WHERE n.nft_symbol = _nft_symbol
+        AND n.signature = _signature
+        AND n.type = _type;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+            NULL;
+    END;
+    IF _activity_id IS NULL THEN
+        BEGIN
+            INSERT INTO nft_activity (
+                signature,
+                type,
+                source,
+                token_mint,
+                nft_symbol,
+                slot,
+                blocktime,
+                buyer,
+                buyer_referral,
+                seller,
+                seller_referral,
+                price
+            )
+            VALUES (
+                _signature,
+                _type,
+                _source,
+                _token_mint,
+                _nft_symbol,
+                _slot,
+                _blocktime,
+                _buyer,
+                _buyer_referral,
+                _seller,
+                _seller_referral,
+                _price
+            )
+            -- REVIEW
+            RETURNING
+                nft_activity.activity_id, nft_activity.nft_symbol, nft_activity.type
+            INTO STRICT _activity_id, __nft_symbol, __type;
+            EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                    RAISE EXCEPTION 'Failed to insert activity: %, %, %', _activity_id, _nft_symbol, _type;
+        END;
+    ELSE
+        BEGIN
+            UPDATE nft_activity
+            SET updated_at = NOW()
+            WHERE nft_activity.activity_id = _activity_id
+            -- REVIEW
+            RETURNING
+                nft_activity.activity_id, nft_activity.nft_symbol, nft_activity.type
+            INTO STRICT _activity_id, __nft_symbol, __type;
+            EXCEPTION WHEN NO_DATA_FOUND THEN
+                RAISE EXCEPTION 'Failed to insert activity: %, %, %', _activity_id, _nft_symbol, _type;
+        END;
+    END IF;
+    RETURN QUERY SELECT _activity_id, _nft_symbol, _type;
+END;
+$$;
+
 
 -- TODO: Fix
 CREATE FUNCTION fetch_discords_pending_update ()

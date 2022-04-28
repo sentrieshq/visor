@@ -492,7 +492,31 @@ const main = async() => {
     }
 
     if(config.twitter) {
-        const queryResult = await client.query(`SELECT nft_symbol, twitter FROM nfts WHERE twitter IS NOT NULL AND nft_id >= 185 ORDER BY nft_id ASC;`)
+        const queryResult = await client.query(
+            `
+            WITH valid_twitter AS (
+                SELECT *
+                FROM nfts
+                WHERE twitter IS NOT NULL
+            ), latest_update AS (
+                SELECT
+                    DISTINCT ON (twitter_stats.twitter_id)
+                    valid_twitter.nft_id AS nft_id,
+                    valid_twitter.nft_symbol AS nft_symbol,
+                    twitter_stats.created_at AS created_at
+                FROM valid_twitter
+                JOIN twitter ON valid_twitter.nft_symbol = twitter.nft_symbol
+                LEFT JOIN twitter_stats ON twitter_stats.twitter_id = twitter.twitter_id
+                ORDER BY twitter_stats.twitter_id, twitter_stats.created_at DESC
+            ), filter_recents AS (
+                SELECT nft_id
+                FROM latest_update
+                WHERE created_at IS NULL
+                OR created_at > NOW() - INTERVAL '3 hours'
+            )
+            SELECT nft_symbol, twitter FROM valid_twitter WHERE nft_id NOT IN (SELECT nft_id FROM filter_recents);
+            `
+        )
 
         for (const row of queryResult.rows) {
             if(!row || !row[0] || !row[1]){
@@ -509,7 +533,7 @@ const main = async() => {
                     continue
                 }
                 const twitterObject = twitterData[0] as twitterData
-                console.log(twitterObject)
+                
                 const remoteId = twitterObject.id
                 const screenName = twitterObject.screen_name
                 const name = twitterObject.name
@@ -524,6 +548,7 @@ const main = async() => {
                         [nftSymbol, remoteId]
                     )
                     if(!find || find.rows.length === 0) {
+                        console.log(twitterObject)
                         try {
                             const result = await client.query(
                                 `INSERT INTO twitter (nft_symbol, screen_name, name, protected, age_gated, remote_id) VALUES ($1, $2, $3, $4, $5, $6);`,
@@ -533,20 +558,20 @@ const main = async() => {
                                 `INSERT INTO twitter (twitter_id, nft_symbol) VALUES ((SELECT twitter_id FROM twitter WHERE nft_symbol = $1), $1);`,
                                 [nftSymbol]
                             )
+                            continue
                         } catch (e) {
                             console.error(e)
                         }
-                    } else {
-                        console.log(`Found twitter for ${screenName} already`)
                     }
                 } catch(e) {
                     console.error(e)
                 }
                 const find2 = await client.query(
-                    `SELECT * FROM twitter WHERE nft_symbol = $1`,
+                    `SELECT * FROM twitter WHERE nft_symbol = $1 OR remote_id = $2`,
                     [nftSymbol, remoteId]
                 )
                 if(find2 && find2.rows.length > 0) {
+                    console.log(twitterObject)
                     const result2 = await client.query(
                         `INSERT INTO twitter_stats (twitter_id, followers_count, formatted_followers_count) VALUES ((SELECT twitter_id FROM twitter WHERE nft_symbol = $1), $2, $3);`,
                         [nftSymbol, followersCount, formattedFollowersCount]
@@ -624,16 +649,17 @@ const main = async() => {
                     const seller = item.seller ? item.seller : null
                     const sellerReferral = item.sellerReferral ? item.sellerReferral : null
                     const price = item.price
-                    console.log(item)
-                    try {
-                        // TODO: Break this out into a function
-                        client.query(
-                            `INSERT INTO nft_activity (signature, type, source, token_mint, nft_symbol, slot, blocktime, buyer, buyer_referral, seller, seller_referral, price)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, ${price}::NUMERIC);`,
-                            [signature, type, source, tokenMint, collection, slot, blockTime, buyer, buyerReferral, seller, sellerReferral]
-                        )
-                    } catch (e) {
-                        console.error(e)
+                    // TODO: Remove this in the future so it's not just buy
+                    if (type === 'buyNow') {
+                        console.log(item)
+                        try {
+                            client.query(
+                                `SELECT * FROM store_activity ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, ${price}::NUMERIC);`,
+                                [signature, type, source, tokenMint, collection, slot, blockTime, buyer, buyerReferral, seller, sellerReferral]
+                            )
+                        } catch (e) {
+                            console.error(e)
+                        }
                     }
                 }
                 await client.query(`COMMIT;`)
