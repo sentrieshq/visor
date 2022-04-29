@@ -239,7 +239,9 @@ const getMeActivity = async(symbol: string, offset: number = 0, limit: number = 
             activityMerged = fData.concat(data)
             //console.log(merged)
             if (Object.keys(data).length >= limit) {
-                // TODO: Issue with this if we have exactly 200 on last page...
+                // TODO: We want to check the last item as concatenated, so we compare...
+                // NOTE: This works with the NFTs wonder why it's not working here, maybe
+                // only 1k lookback is available...
                 if(shallowEqual(fData, data)) {
                     console.log('looping')
                     
@@ -580,10 +582,9 @@ const main = async() => {
                                 [nftSymbol, screenName, name, _protected, ageGated, remoteId]
                             )
                             const result2 = await client.query(
-                                `INSERT INTO twitter (twitter_id, nft_symbol) VALUES ((SELECT twitter_id FROM twitter WHERE nft_symbol = $1), $1);`,
+                                `INSERT INTO twitter_nfts (twitter_id, nft_symbol) VALUES ((SELECT twitter_id FROM twitter WHERE nft_symbol = $1), $1);`,
                                 [nftSymbol]
                             )
-                            continue
                         } catch (e) {
                             console.error(e)
                         }
