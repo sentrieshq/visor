@@ -288,6 +288,7 @@ BEGIN
         BEGIN
             UPDATE nft_activity
             SET updated_at = NOW()
+            -- TODO: update source where undefined.
             WHERE nft_activity.activity_id = _activity_id
             -- REVIEW
             RETURNING

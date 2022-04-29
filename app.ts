@@ -40,7 +40,11 @@ const config = {
     activity: process.env.ACTIVITY || false
 }
 
-let merged = []
+let nftMerged = []
+
+let activityMerged = []
+
+
 
 const shallowEqual = async(object1, object2) => {
     const keys1 = Object.keys(object1);
@@ -81,7 +85,7 @@ const getMeNft = async(offset=0, limit=200, fData=[]) => {
     try {
         const data = await got.get(url).json() as unknown as Array<object>
         
-        merged = fData.concat(data)
+        nftMerged = fData.concat(data)
         //console.log(merged)
         if (Object.keys(data).length >= limit) {
             // TODO: Issue with this if we have exactly 200 on last page...
@@ -91,13 +95,13 @@ const getMeNft = async(offset=0, limit=200, fData=[]) => {
                 // Recursion
                 offset = offset + limit
                 console.log(offset)
-                await getMeNft(offset, limit, merged)
+                await getMeNft(offset, limit, nftMerged)
             }
         }
     } catch (e) {
         console.error(e)
     }
-    return merged
+    return nftMerged
 }
 
 const getMeLaunchpadStats = async(offset=0, limit=200) => {
@@ -207,7 +211,7 @@ const getTwitterStats = async(twitterName: string) => {
     return data
 }
 
-const getMeActivity = async(symbol: string, offset: number = 0, limit: number = 500) => {
+const getMeActivity = async(symbol: string, offset: number = 0, limit: number = 500, fData = []) => {
     /*
     [
         {
@@ -228,8 +232,29 @@ const getMeActivity = async(symbol: string, offset: number = 0, limit: number = 
     */
     const url = `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/activities?offset=${offset}&limit=${limit}`
     // TODO: Recursion?? For how long?
-    const data = await got.get(url).json()
-    return data
+    if (offset <= 10000) {
+        try {
+            const data = await got.get(url).json() as unknown as Array<object>
+            
+            activityMerged = fData.concat(data)
+            //console.log(merged)
+            if (Object.keys(data).length >= limit) {
+                // TODO: Issue with this if we have exactly 200 on last page...
+                if(shallowEqual(fData, data)) {
+                    console.log('looping')
+                    
+                    // Recursion
+                    offset = offset + limit
+                    console.log(offset)
+                    
+                    await getMeActivity(symbol, offset, limit, activityMerged)
+                }
+            }
+        } catch (e) {
+            console.error(e)
+        }
+    }
+    return activityMerged
 }
 
 const getMeDrops = async(limit: number = 250, offset: number = 0) => {
@@ -651,7 +676,7 @@ const main = async() => {
                     const price = item.price
                     // TODO: Remove this in the future so it's not just buy
                     if (type === 'buyNow') {
-                        console.log(item)
+                        console.log(`adding: ${collection} at blocktime ${blockTime}`)
                         try {
                             client.query(
                                 `SELECT * FROM store_activity ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, ${price}::NUMERIC);`,
