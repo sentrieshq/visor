@@ -592,14 +592,17 @@ const main = async() => {
                 } catch(e) {
                     console.error(e)
                 }
+                //
                 const find2 = await client.query(
                     `SELECT * FROM twitter WHERE nft_symbol = $1 OR remote_id = $2`,
                     [nftSymbol, remoteId]
                 )
                 if(find2 && find2.rows.length > 0) {
                     console.log(twitterObject)
+                    // TODO: Fix with function, this is an issue when adding things to the db where we may already have the details.
+                    // QUESTION: Do we care if we capture more data throughout?
                     const result2 = await client.query(
-                        `INSERT INTO twitter_stats (twitter_id, followers_count, formatted_followers_count) VALUES ((SELECT twitter_id FROM twitter WHERE nft_symbol = $1), $2, $3);`,
+                        `INSERT INTO twitter_stats (twitter_id, followers_count, formatted_followers_count) VALUES ((SELECT twitter_id FROM twitter_nfts WHERE nft_symbol = $1), $2, $3);`,
                         [nftSymbol, followersCount, formattedFollowersCount]
                     )
                 } else {
